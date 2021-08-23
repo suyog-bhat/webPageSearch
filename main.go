@@ -27,38 +27,38 @@ type pair struct {
 	val   float64
 }
 
-func parse_page_query(lines string) ([]page, []query) {
+func parsePageQuery(lines string) ([]page, []query) {
 	var pages []page
 	var queries []query
-	line_slice := strings.Split(lines, "\n")
+	lineSlice := strings.Split(lines, "\n")
 	var p page
 	var q query
-	var p_index, q_index, subpage_index int
-	for _, v := range line_slice {
+	var pIndex, qIndex, subpageIndex int
+	for _, v := range lineSlice {
 		line := strings.Split(v, " ")
 		wt := len(line) - 1
-		if max_wt < wt {
-			max_wt = wt
+		if maxWt < wt {
+			maxWt = wt
 		}
 		if line[0] == "P" {
 			p.words = line[1:]
-			p_index++
-			subpage_index = 0
-			p.index = p_index
+			pIndex++
+			subpageIndex = 0
+			p.index = pIndex
 			p.parent = 0
 			pages = append(pages, p)
 
 		} else if line[0] == "PP" {
 			p.words = line[1:]
-			p.parent = p_index
-			subpage_index++
-			p.index = subpage_index
+			p.parent = pIndex
+			subpageIndex++
+			p.index = subpageIndex
 			pages = append(pages, p)
 
 		} else if line[0] == "Q" {
 			q.words = line[1:]
-			q_index++
-			q.index = q_index
+			qIndex++
+			q.index = qIndex
 			queries = append(queries, q)
 
 		} else {
@@ -68,7 +68,7 @@ func parse_page_query(lines string) ([]page, []query) {
 	return pages, queries
 }
 
-func get_main_page_count(pages []page) int {
+func getMainPageCount(pages []page) int {
 	var c int
 	for _, v := range pages {
 		if v.parent == 0 {
@@ -78,22 +78,22 @@ func get_main_page_count(pages []page) int {
 	return c
 }
 
-func prepare_output(page_rank []pair, q_num int, outfile []string) {
+func prepareOutput(pageRank []pair, qNum int, outfile []string) {
 	var max pair
 	// fmt.Printf("Q%d :=", q_num)
-	outfile[q_num-1] = fmt.Sprintf("Q%d :=", q_num)
-	for i := 0; i < 5 && i < len(page_rank); i++ {
+	outfile[qNum-1] = fmt.Sprintf("Q%d :=", qNum)
+	for i := 0; i < 5 && i < len(pageRank); i++ {
 		max.val = 0
-		for ind, v := range page_rank {
+		for ind, v := range pageRank {
 			if max.val < v.val {
 				max.val = v.val
 				max.index = ind
 			}
 		}
-		page_rank[max.index].val = 0
+		pageRank[max.index].val = 0
 		if max.val > 0 {
 			// fmt.Printf(" P%d", max.index+1)
-			outfile[q_num-1] = outfile[q_num-1] + fmt.Sprintf(" P%d", page_rank[max.index].index)
+			outfile[qNum-1] = outfile[qNum-1] + fmt.Sprintf(" P%d", pageRank[max.index].index)
 		} else {
 			break
 		}
@@ -102,44 +102,44 @@ func prepare_output(page_rank []pair, q_num int, outfile []string) {
 
 }
 
-func calc_each_query(q_num int, query query, p_count int, pages []page, outfile []string, wg *sync.WaitGroup) {
-	var temp_wt float64
-	page_rank := make([]pair, p_count)
-	var page_num int = -1
+func calcEachQuery(qNum int, query query, pCount int, pages []page, outfile []string, wg *sync.WaitGroup) {
+	var tempWt float64
+	pageRank := make([]pair, pCount)
+	var pageNum = -1
 	for _, page := range pages {
 		if page.parent == 0 {
-			temp_wt = 0
-			page_num++
+			tempWt = 0
+			pageNum++
 		}
-		for i, query_word := range query.words {
-			for j, page_word := range page.words {
-				if query_word == page_word {
+		for i, queryWord := range query.words {
+			for j, pageWord := range page.words {
+				if queryWord == pageWord {
 					if page.parent == 0 {
-						temp_wt += (float64(max_wt) - float64(i)) * (float64(max_wt) - float64(j))
+						tempWt += (float64(maxWt) - float64(i)) * (float64(maxWt) - float64(j))
 						break
 					} else {
-						temp_wt += (float64(max_wt) - float64(i)) * (float64(max_wt) - float64(j)) * .1
+						tempWt += (float64(maxWt) - float64(i)) * (float64(maxWt) - float64(j)) * .1
 					}
 				}
 			}
 		}
-		page_rank[page_num] = pair{page_num + 1, temp_wt}
+		pageRank[pageNum] = pair{pageNum + 1, tempWt}
 	}
 	// fmt.Println(page_rank)
 	// fmt.Println(max_wt)
-	prepare_output(page_rank, q_num+1, outfile)
+	prepareOutput(pageRank, qNum+1, outfile)
 	//fmt.Println("from brute: ", page_rank)
 	wg.Done()
 }
 
-func calc_strength(outfile []string, pages []page, queries []query) {
+func calcStrength(outfile []string, pages []page, queries []query) {
 
 	// fmt.Println(max_wt)
 	var wg sync.WaitGroup
-	p_count := get_main_page_count(pages)
-	for q_num, query := range queries {
+	pCount := getMainPageCount(pages)
+	for qNum, query := range queries {
 		wg.Add(1)
-		go calc_each_query(q_num, query, p_count, pages, outfile, &wg)
+		go calcEachQuery(qNum, query, pCount, pages, outfile, &wg)
 
 	}
 
@@ -148,92 +148,92 @@ func calc_strength(outfile []string, pages []page, queries []query) {
 
 //////////////////////////////////////////////////////////////////
 
-func ceate_ref_table(pages []page) (map[string][]pair, map[string][]pair) {
-	main_ref_table := make(map[string][]pair)
-	sub_ref_table := make(map[string][]pair)
+func ceateRefTable(pages []page) (map[string][]pair, map[string][]pair) {
+	mainRefTable := make(map[string][]pair)
+	subRefTable := make(map[string][]pair)
 	for _, v := range pages {
 		for j, word := range v.words {
 			if v.parent == 0 {
-				res := main_ref_table[word]
-				res = append(res, pair{v.index, float64(max_wt) - float64(j)})
-				main_ref_table[word] = res
+				res := mainRefTable[word]
+				res = append(res, pair{v.index, float64(maxWt) - float64(j)})
+				mainRefTable[word] = res
 			} else {
-				res := sub_ref_table[word]
-				res = append(res, pair{v.parent, float64(max_wt) - float64(j)})
-				sub_ref_table[word] = res
+				res := subRefTable[word]
+				res = append(res, pair{v.parent, float64(maxWt) - float64(j)})
+				subRefTable[word] = res
 			}
 
 		}
 	}
-	return main_ref_table, sub_ref_table
+	return mainRefTable, subRefTable
 }
 
-func get_pair_slice(page_rank map[int]float64) []pair {
+func getPairSlice(pageRank map[int]float64) []pair {
 	keys := make([]int, 0)
-	for k, _ := range page_rank {
+	for k := range pageRank {
 		keys = append(keys, k)
 	}
 	sort.Ints(keys)
 	var p []pair
 	for _, v := range keys {
-		p = append(p, pair{v, page_rank[v]})
+		p = append(p, pair{v, pageRank[v]})
 	}
 	return p
 }
 
-func cal_pwt_ref_table(main_ref_table map[string][]pair, sub_ref_table map[string][]pair, q_num int, query query, out_file []string, wg1 *sync.WaitGroup) {
-	page_rank := make(map[int]float64)
+func calPwtRefTable(mainRefTable map[string][]pair, subRefTable map[string][]pair, qNum int, query query, outFile []string, wg1 *sync.WaitGroup) {
+	pageRank := make(map[int]float64)
 	for _, word := range query.words {
-		page_array := main_ref_table[word]
-		for _, val := range page_array {
-			page_rank[val.index] += float64(max_wt) * val.val
+		pageArray := mainRefTable[word]
+		for _, val := range pageArray {
+			pageRank[val.index] += float64(maxWt) * val.val
 		}
-		sub_page_array := sub_ref_table[word]
-		for _, val := range sub_page_array {
-			page_rank[val.index] += (0.1 * (float64(max_wt) * val.val))
+		subPageArray := subRefTable[word]
+		for _, val := range subPageArray {
+			pageRank[val.index] += 0.1 * (float64(maxWt) * val.val)
 		}
 
 	}
 	// fmt.Println("Query num:= ", q_num+1)
 	//fmt.Println(page_rank)
-	for_out := get_pair_slice(page_rank)
-	fmt.Println(q_num+1, for_out)
-	prepare_output(for_out, q_num+1, out_file)
+	forOut := getPairSlice(pageRank)
+	fmt.Println(qNum+1, forOut)
+	prepareOutput(forOut, qNum+1, outFile)
 	wg1.Done()
 }
-func calc_strength_ref_table(main_ref_table map[string][]pair, sub_ref_table map[string][]pair, queries []query, out_file []string) {
+func calcStrengthRefTable(mainRefTable map[string][]pair, subRefTable map[string][]pair, queries []query, outFile []string) {
 
 	var wg1 sync.WaitGroup
-	for q_num, query := range queries {
+	for qNum, query := range queries {
 		wg1.Add(1)
-		go cal_pwt_ref_table(main_ref_table, sub_ref_table, q_num, query, out_file, &wg1)
+		go calPwtRefTable(mainRefTable, subRefTable, qNum, query, outFile, &wg1)
 	}
 	wg1.Wait()
 }
 
 ////////////////////////////////////////////////////
 
-var max_wt int
+var maxWt int
 
-func start_process(w http.ResponseWriter, r *http.Request) {
+func startProcess(w http.ResponseWriter, r *http.Request) {
 	var pages []page
 	var queries []query
 
 	content, err := ioutil.ReadAll(r.Body)
 	if err == nil {
 		lines := string(content)
-		pages, queries = parse_page_query(lines)
+		pages, queries = parsePageQuery(lines)
 	}
 
 	var outfile = make([]string, len(queries))
 	var outfile1 = make([]string, len(queries))
 
-	//pageweight calculaton using bruteforce
-	calc_strength(outfile, pages, queries)
+	//page weight calculation using bruteforce
+	calcStrength(outfile, pages, queries)
 
 	//creating map of keywords and associated pages
-	main, sub := ceate_ref_table(pages)
-	calc_strength_ref_table(main, sub, queries, outfile1)
+	main, sub := ceateRefTable(pages)
+	calcStrengthRefTable(main, sub, queries, outfile1)
 
 	for _, v := range outfile {
 		fmt.Fprintf(w, v)
@@ -252,7 +252,7 @@ func start_process(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	r := mux.NewRouter().StrictSlash(true)
-	r.HandleFunc("/page", start_process).Methods("POST")
+	r.HandleFunc("/page", startProcess).Methods("POST")
 	log.Fatal(http.ListenAndServe(":8000", r))
 
 }
